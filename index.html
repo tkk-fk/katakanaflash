@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>カタカナフラッシュカード</title>
+    <style>
+        /* 共通設定・リセット */
+        :root {
+            --primary-color: #ff7f50;
+            --secondary-color: #4facfe;
+            --selected-color: #32cd32;
+            --accent-color: #ffd700;
+            --bg-color: #fffcf5;
+            --text-color: #333;
+        }
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'UD Digi Kyokasho NK-R', 'Hiragino Maru Gothic ProN', 'Rounded M+ 1c', 'Meiryo', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+        .screen {
+            width: 100vw;
+            height: 100vh;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .screen.active {
+            display: flex;
+        }
+
+        /* 設定画面のデザイン */
+        h1 {
+            font-size: 2rem;
+            color: var(--primary-color);
+            margin-top: 0;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        .setting-panel {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 20px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #555;
+            border-bottom: 2px dashed #eee;
+            padding-bottom: 5px;
+        }
+        
+        /* 選択ボタン（トグルボタン） */
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .option-btn {
+            background-color: #f0f0f0;
+            border: 2px solid #ddd;
+            color: #666;
+            padding: 8px 12px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 3px 0 #ccc;
+            flex: 1 1 auto;
+            text-align: center;
+        }
+        .option-btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 0 0 #ccc;
+        }
+        .option-btn.selected {
+            background-color: var(--selected-color);
+            color: white;
+            border-color: var(--selected-color);
+            box-shadow: 0 3px 0 #228b22;
+            transform: translateY(-1px);
+        }
+        .option-btn.selected:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #228b22;
+        }
+
+        /* ボタン */
+        .btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.5rem;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 6px 0 #d95d30;
+            transition: all 0.2s ease;
+            width: 100%;
+            margin-top: 15px;
+        }
+        .btn:active {
+            transform: translateY(6px);
+            box-shadow: 0 0 0 transparent;
+        }
+        .btn-secondary {
+            background: var(--secondary-color);
+            box-shadow: 0 6px 0 #3182ce;
+        }
+
+        /* 画面右上の戻るボタン */
+        .corner-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #666;
+            border: 2px solid #ddd;
+            padding: 8px 16px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: 20px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+        .corner-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background-color: #f0f0f0;
+        }
+
+        /* フラッシュカード画面 */
+        #flashcard-screen {
+            background-color: #ffffff;
+            cursor: pointer;
+            position: relative;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+        #word-display {
+            font-weight: bold;
+            text-align: center;
+            width: 100%;
+            white-space: nowrap;
+            letter-spacing: 0.05em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+        }
+        #instruction {
+            position: absolute;
+            bottom: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.3rem;
+            color: #888;
+            background: rgba(255,255,255,0.9);
+            padding: 8px 20px;
+            border-radius: 30px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        /* 結果画面の装飾 */
+        .result-illustration {
+            width: 200px;
+            height: 200px;
+            margin-bottom: 20px;
+            animation: popIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+        @keyframes popIn {
+            0% { transform: scale(0) rotate(-20deg); opacity: 0; }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+
+        #result-message {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 2rem;
+            line-height: 1.4;
+            text-align: center;
+            color: #555;
+        }
+        #result-message .highlight {
+            color: var(--primary-color);
+            font-size: 2.2rem;
+        }
+        .result-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            max-width: 280px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="setup-screen" class="screen active">
+        <div class="setting-panel">
+            <h1>カタカナカード</h1>
+            
+            <div class="form-group">
+                <label>もじのかず</label>
+                <div class="button-group" id="group-length">
+                    <button class="option-btn" data-value="2">2もじ</button>
+                    <button class="option-btn" data-value="3">3もじ</button>
+                    <button class="option-btn" data-value="4">4もじ</button>
+                    <button class="option-btn" data-value="5">5もじ</button>
+                    <button class="option-btn" data-value="6">6もじ</button>
+                    <button class="option-btn" data-value="7">7もじ</button>
+                    <button class="option-btn" data-value="8">8もじ</button>
+                    <button class="option-btn" data-value="9">9もじ</button>
+                    <button class="option-btn" data-value="10">10もじ</button>
+                    <button class="option-btn selected" data-value="random" style="flex-basis: 100%;">ランダム</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>だくおん（バ・パ など）</label>
+                <div class="button-group" id="group-dakuon">
+                    <button class="option-btn selected" data-value="yes">あり</button>
+                    <button class="option-btn" data-value="no">なし</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>もんだいのかず</label>
+                <div class="button-group" id="group-count">
+                    <button class="option-btn selected" data-value="10">10問</button>
+                    <button class="option-btn" data-value="15">15問</button>
+                    <button class="option-btn" data-value="20">20問</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>よみあげ</label>
+                <div class="button-group" id="group-audio">
+                    <button class="option-btn selected" data-value="yes">あり</button>
+                    <button class="option-btn" data-value="no">なし</button>
+                </div>
+            </div>
+
+            <button id="start-btn" class="btn">スタート！</button>
+        </div>
+    </div>
+
+    <div id="flashcard-screen" class="screen">
+        <button id="flashcard-back-btn" class="corner-btn">もどる</button>
+        <div id="word-display">リンゴ</div>
+        <div id="instruction">タッチ または ドラッグ で つぎへ</div>
+    </div>
+
+    <div id="result-screen" class="screen">
+        <svg class="result-illustration" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+            <defs>
+                <linearGradient id="flower-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#ff9a9e;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#fad0c4;stop-opacity:1" />
+                </linearGradient>
+            </defs>
+            <path d="M100,10 C50,10 10,50 10,100 C10,150 50,190 100,190 C150,190 190,150 190,100 C190,50 150,10 100,10 Z" fill="none" stroke="var(--primary-color)" stroke-width="8" stroke-dasharray="15 10" stroke-linecap="round" opacity="0.3"/>
+            <path d="M100,20 C60,20 20,60 20,100 C20,140 60,180 100,180 C140,180 180,140 180,100 C180,60 140,20 100,20 Z M100,160 C70,160 40,130 40,100 C40,70 70,40 100,40 C130,40 160,70 160,100 C160,130 130,160 100,160 Z" fill="url(#flower-grad)" stroke="var(--primary-color)" stroke-width="5" stroke-linejoin="round"/>
+            <g transform="translate(100, 100) scale(0.8)">
+                <path d="M0,-70 L20,-25 L70,-20 L35,15 L50,65 L0,40 L-50,65 L-35,15 L-70,-20 L-20,-25 Z" fill="var(--accent-color)" stroke="#e6b800" stroke-width="5" stroke-linejoin="round"/>
+                <circle cx="-15" cy="-10" r="5" fill="#333"/>
+                <circle cx="15" cy="-10" r="5" fill="#333"/>
+                <path d="M-20,15 Q0,35 20,15" fill="none" stroke="#333" stroke-width="5" stroke-linecap="round"/>
+            </g>
+            <g fill="var(--accent-color)">
+                <circle cx="20" cy="40" r="5"/><circle cx="180" cy="50" r="8"/>
+                <circle cx="160" cy="160" r="6"/><circle cx="30" cy="150" r="7"/>
+                <circle cx="90" cy="10" r="4"/><circle cx="110" cy="185" r="5"/>
+            </g>
+        </svg>
+
+        <div id="result-message">
+            すごい！よくがんばったね！<br>
+            ぜんぶで <span id="result-count" class="highlight">0</span> まい<br>れんしゅうしたよ。
+        </div>
+        <div class="result-buttons">
+            <button id="retry-btn" class="btn">もういっかい</button>
+            <button id="back-btn" class="btn btn-secondary">もどる</button>
+        </div>
+    </div>
+
+    <script>
+        const allWords = [
+            "メモ", "ベル", "クモ", "シカ", "ツル", "サメ", "カメ", "タコ", "イカ", "カニ", "ネコ", "イヌ", "サル", "クマ", "トラ", "イス", "アリ", "クツ", "ハト", "ハチ", "バス", "ドア", "ゼロ", "パン", "ペン", "ゴミ", "ゾウ", "ブタ", "カギ", "ピザ", "エビ", "ゴマ", "マチ", "ユキ", "ウシ", "ウマ", "ハコ", "ホシ", "モモ", "ユメ",
+            "ノート", "ケーキ", "シャツ", "サイフ", "マウス", "タオル", "トマト", "ピアノ", "カメラ", "イルカ", "マスク", "クラス", "スイカ", "テスト", "コップ", "ヨット", "テント", "サクラ", "マイク", "ミルク", "レモン", "ラジオ", "テレビ", "メガネ", "ビデオ", "リンゴ", "バナナ", "リボン", "メロン", "ズボン", "ゴリラ", "ボタン", "ガラス", "コイン", "コアラ", "マッチ", "ポスト", "マント", "トイレ", "バケツ", "クイズ", "ギター", "アヒル",
+            "マフラー", "ロケット", "キャンプ", "トンネル", "チケット", "クッキー", "リュック", "スリッパ", "スイッチ", "マラソン", "トランク", "トランプ", "ピーマン", "フクロウ", "シャワー", "パトカー", "ブランコ", "ペンギン", "キャベツ", "パジャマ", "オルガン", "ライオン", "チーター", "ペリカン", "ダチョウ", "パンサー", "パソコン", "テーブル", "ソファー", "エアコン", "シチュー", "デザート", "ワッフル", "ドーナツ", "チュロス", "ニンジン", "タマネギ", "ダイコン", "レンコン",
+            "オムライス", "フライパン", "レストラン", "カタツムリ", "パンケーキ", "ランドセル", "ダンボール", "ヨーグルト", "ハンバーグ", "カブトムシ", "オートバイ", "カレンダー", "スパゲティ", "ビスケット", "キャラメル", "ピーナッツ", "マヨネーズ", "ケチャップ", "ソーセージ", "ハムエッグ", "サツマイモ", "ジャガイモ", "アブラゼミ", "チョウチョ", "カメレオン", "アナコンダ", "フェレット", "ハムスター", "モルモット", "ジャッカル", "アライグマ", "ナマケモノ", "カンガルー", "ハリネズミ", "タブレット", "ネックレス", "フライヤー", "ドライヤー", "クレンザー", "トラクター",
+            "トウモロコシ", "チョコレート", "ホットケーキ", "エレベーター", "サンドイッチ", "プラスチック", "トランペット", "クロワッサン", "ヘリコプター", "オリンピック", "ブロッコリー", "カリフラワー", "アスパラガス", "テントウムシ", "ミンミンゼミ", "クロコダイル", "アリゲーター", "ウォンバット", "チューリップ", "マーガレット", "ハイビスカス", "ポインセチア", "シロツメクサ", "ドーベルマン", "ポメラニアン", "ダルメシアン", "ヨークシャー", "ニューヨーク", "ロサンゼルス", "パラシュート", "パンフレット", "マイナンバー", "ビデオカメラ", "シートベルト", "ヘッドライト", "テールランプ", "ルームミラー", "カーエアコン", "ウォッシャー",
+            "アイスクリーム", "スマートフォン", "カーネーション", "オタマジャクシ", "レッサーパンダ", "ホッキョクグマ", "オーストラリア", "フロントガラス", "コントローラー", "ソフトクリーム", "エスカレーター", "トライアングル", "サンドウィッチ", "グリーンピース", "ツクツクボウシ", "フクロモモンガ", "ダックスフンド", "グレイハウンド", "プラネタリウム", "モーターボート", "ホバークラフト", "ペーパータオル", "フェイスタオル", "トリートメント", "ボディーソープ", "リップクリーム", "ハンドクリーム", "ネイルファイル", "チューブトップ", "スポーツウェア", "ショートパンツ", "フレアスカート", "タイトスカート", "ショートブーツ", "ルームシューズ", "タイムカプセル", "クリアファイル", "セロハンテープ", "カッターナイフ",
+            "フレンチトースト", "ティラノサウルス", "スマートウォッチ", "ローラースケート", "クリスマスツリー", "バスケットボール", "メリーゴーランド", "キャンピングカー", "オレンジジュース", "アップルジュース", "グレープフルーツ", "マカダミアナッツ", "ブラキオサウルス", "スペースシャトル", "スーパーマーケット", "クレジットカード", "キャッシュカード", "プリーツスカート", "シャープペンシル", "マスキングテープ", "アプリケーション", "インフルエンサー", "ショルダーバッグ", "スピードスケート", "クロスカントリー", "マウンテンバイク", "アンインストール", "ストップウォッチ", "アンキロサウルス", "プレシオサウルス", "パラサウロロフス", "ホイールローダー", "アメリカンドッグ", "ハッシュドポテト", "ショートケーキセット", "ホットケーキミックス",
+            "ホットチョコレート", "チョコミントアイス", "シャインマスカット", "ショッピングモール", "ハッピーバースデー", "ストロベリーパフェ", "ガーリックトースト", "ドライブレコーダー", "トイレットペーパー", "ティッシュペーパー", "ウェットティッシュ", "フィギュアスケート", "インラインスケート", "ポケットティッシュ", "ミルクチョコレート", "ウインドブレーカー", "モバイルバッテリー", "ジェットコースター", "チョコレートパフェ", "カスタードクリーム", "ハンバーグステーキ", "トマトソースパスタ", "マウンテンライオン", "ガラパゴスゾウガメ", "パイナップルタルト", "マカダミアクッキー", "ブルーベリージャム", "ストロベリージャム", "ピーチフラペチーノ", "アールグレイティー", "フルーツタルトタタン",
+            "ファミリーレストラン", "コンビニエンスストア", "ゴールデンレトリバー", "ペロペロキャンディー", "バニラアイスクリーム", "パイナップルジュース", "ヘラクレスオオカブト", "ダブルチーズバーガー", "デスクトップパソコン", "バニラソフトクリーム", "フレンチドレッシング", "シーザードレッシング", "ホワイトチョコレート", "チョコレートソース", "キャンベルハムスター", "マンゴーフラペチーノ", "キャラメルマキアート", "チョコレートクッキー", "ウォータースライダー", "コンクリートミキサー", "チョコレートケーキ", "ブルーベリーケーキ", "ヘーゼルナッツチョコ", "オレンジシャーベット", "チキンマックナゲット", "スマートフォンカバー", "インスタントカメラ", "ショッピングセンター", "エレクトリックギター", "フルーツタルトケーキ", "ソフトクリームセット"
+        ];
+
+        const dakuonRegex = /[ガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポヴ]/;
+
+        let playWords = [];
+        let currentIndex = 0;
+        let isAudioOn = false;
+        let hasReadCurrentCard = false;
+        let practiceCount = 0;
+
+        // ボタン切り替え
+        const groups = document.querySelectorAll('.button-group');
+        for (let i = 0; i < groups.length; i++) {
+            const buttons = groups[i].querySelectorAll('.option-btn');
+            for (let j = 0; j < buttons.length; j++) {
+                buttons[j].addEventListener('click', function() {
+                    for (let k = 0; k < buttons.length; k++) {
+                        buttons[k].classList.remove('selected');
+                    }
+                    this.classList.add('selected');
+                });
+            }
+        }
+
+        function getSelectedValue(groupId) {
+            const selectedBtn = document.querySelector('#' + groupId + ' .option-btn.selected');
+            return selectedBtn ? selectedBtn.getAttribute('data-value') : null;
+        }
+
+        // --- 修正: 音声読み上げを安全かつ確実に行う処理 ---
+        function playAudio(text) {
+            try {
+                if ('speechSynthesis' in window) {
+                    // iOSバグ対策：連続で呼ばれた時にリセットするが、少し時間をおいてから発声する
+                    if (window.speechSynthesis.speaking) {
+                        window.speechSynthesis.cancel();
+                    }
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'ja-JP';
+                    utterance.rate = 0.85; 
+                    
+                    // すぐにspeakするとiOSで無視されることがあるため、ほんの少し遅延させる
+                    setTimeout(() => {
+                        window.speechSynthesis.speak(utterance);
+                    }, 50);
+                }
+            } catch (e) {
+                console.log("Audio API is blocked or unavailable.", e);
+            }
+        }
+
+        function startGame() {
+            const lengthSetting = getSelectedValue('group-length');
+            const dakuonSetting = getSelectedValue('group-dakuon');
+            const countSetting = parseInt(getSelectedValue('group-count'), 10) || 10;
+            isAudioOn = getSelectedValue('group-audio') === 'yes';
+
+            let filteredWords = [];
+            for (let i = 0; i < allWords.length; i++) {
+                const word = allWords[i];
+                let isMatch = true;
+                if (lengthSetting !== 'random' && word.length !== parseInt(lengthSetting, 10)) isMatch = false;
+                if (dakuonSetting === 'no' && dakuonRegex.test(word)) isMatch = false;
+                if (isMatch) filteredWords.push(word);
+            }
+
+            if (filteredWords.length === 0) {
+                const startBtn = document.getElementById('start-btn');
+                const prevText = startBtn.innerText;
+                startBtn.innerText = "ことばがみつからないよ！";
+                startBtn.style.backgroundColor = "#888";
+                startBtn.style.boxShadow = "0 6px 0 #555";
+                setTimeout(() => {
+                    startBtn.innerText = prevText;
+                    startBtn.style.backgroundColor = "var(--primary-color)";
+                    startBtn.style.boxShadow = "0 6px 0 #d95d30";
+                }, 2000);
+                return;
+            }
+
+            filteredWords.sort(() => 0.5 - Math.random());
+
+            playWords = [];
+            while (playWords.length < countSetting) {
+                for (let i = 0; i < filteredWords.length; i++) {
+                    playWords.push(filteredWords[i]);
+                }
+            }
+            playWords = playWords.slice(0, countSetting);
+
+            currentIndex = 0;
+            hasReadCurrentCard = false;
+            practiceCount = countSetting;
+
+            document.getElementById('setup-screen').classList.remove('active');
+            document.getElementById('result-screen').classList.remove('active');
+            document.getElementById('flashcard-screen').classList.add('active');
+
+            renderCard();
+        }
+
+        function renderCard() {
+            if (!playWords || playWords.length === 0) return;
+            hasReadCurrentCard = false;
+            const currentWord = playWords[currentIndex];
+            const wordDisplay = document.getElementById('word-display');
+            wordDisplay.innerText = currentWord;
+
+            const wordLength = currentWord.length;
+            let fontSize = 85 / wordLength; 
+            if (fontSize > 28) fontSize = 28; 
+            
+            wordDisplay.style.fontSize = fontSize + 'vmin';
+
+            const instruction = document.getElementById('instruction');
+            if (isAudioOn) {
+                instruction.innerText = "タッチ で よみあげるよ";
+            } else {
+                instruction.innerText = "タッチ または ドラッグ で つぎへ";
+            }
+        }
+
+        function nextCard() {
+            currentIndex++;
+            if (currentIndex >= playWords.length) {
+                document.getElementById('flashcard-screen').classList.remove('active');
+                document.getElementById('result-screen').classList.add('active');
+                document.getElementById('result-count').innerText = practiceCount;
+                
+                const illustration = document.querySelector('.result-illustration');
+                illustration.style.animation = 'none';
+                illustration.offsetHeight; 
+                illustration.style.animation = null;
+            } else {
+                renderCard();
+            }
+        }
+
+        function handleInteraction() {
+            if (isAudioOn) {
+                if (!hasReadCurrentCard) {
+                    playAudio(playWords[currentIndex]);
+                    hasReadCurrentCard = true;
+                    document.getElementById('instruction').innerText = "もういちど タッチ で つぎへ";
+                } else {
+                    nextCard();
+                }
+            } else {
+                nextCard();
+            }
+        }
+
+        // --- 修正: 誤動作（ダブルタップ判定）を完全にブロックする処理 ---
+        let lastInteractionTime = 0; // 最後にタッチした時間を記録
+
+        function handleEnd(e) {
+            const now = Date.now();
+            // ★前回のタッチから0.4秒以内の反応は「ダブルタップの誤動作」とみなして無視する
+            if (now - lastInteractionTime < 400) return; 
+
+            lastInteractionTime = now; // タッチした時間を更新
+            handleInteraction();
+        }
+
+        const flashcardScreen = document.getElementById('flashcard-screen');
+        // mousedownとtouchendの両方が発火しても、上記の時間ブロックで重複を防ぎます
+        flashcardScreen.addEventListener('mouseup', handleEnd);
+        flashcardScreen.addEventListener('touchend', handleEnd, {passive: true});
+
+        // 右上の戻るボタン
+        const flashcardBackBtn = document.getElementById('flashcard-back-btn');
+        function stopEvent(e) { e.stopPropagation(); }
+        flashcardBackBtn.addEventListener('mousedown', stopEvent);
+        flashcardBackBtn.addEventListener('touchstart', stopEvent, {passive: false});
+        flashcardBackBtn.addEventListener('mouseup', stopEvent);
+        flashcardBackBtn.addEventListener('touchend', stopEvent);
+        flashcardBackBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            try {
+                if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+            } catch (err) {}
+            document.getElementById('flashcard-screen').classList.remove('active');
+            document.getElementById('setup-screen').classList.add('active');
+        });
+
+        // スタートボタン
+        document.getElementById('start-btn').addEventListener('click', () => {
+            try {
+                if ('speechSynthesis' in window) {
+                    const unlockUtterance = new SpeechSynthesisUtterance('');
+                    window.speechSynthesis.speak(unlockUtterance);
+                }
+            } catch (error) {}
+            startGame();
+        });
+
+        document.getElementById('retry-btn').addEventListener('click', startGame);
+
+        document.getElementById('back-btn').addEventListener('click', () => {
+            document.getElementById('result-screen').classList.remove('active');
+            document.getElementById('setup-screen').classList.add('active');
+        });
+
+    </script>
+</body>
+</html>
